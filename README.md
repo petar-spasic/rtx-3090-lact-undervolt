@@ -18,17 +18,31 @@ Rewritten only on change.
 Tunables at top: `MIN_CLOCK`, `MAX_CLOCK`, `CLOCK_OFFSET`, `GPU_MATCH`.
 
 ## Requirements
-- Root on the host with the 3090s. Proxmox: the PVE host, not an LXC (containers can't set clocks; they inherit the host's).
+- Root on the host with the 3090s, systemd. Not in an unprivileged container
+  (e.g. Proxmox LXC: can't set clocks, inherits the host's). Proxmox: run on the PVE host.
 - NVIDIA driver with its CUDA/NVML libraries (LACT requirement; not nouveau), `nvidia-smi` working.
-- [LACT](https://github.com/ilya-zlobintsev/LACT/releases) headless `.deb`.
-- `python3-yaml`.
+- LACT native package, headless is enough (script calls the `lact` binary; not Flatpak/Docker):
+  [releases][r] (per distro version; v0.10.1 has no Debian 12 / PVE 8 build), Fedora also
+  [Copr](https://copr.fedorainfracloud.org/coprs/ilyaz/LACT/). Gentoo, NixOS, Solus:
+  [LACT install](https://github.com/ilya-zlobintsev/LACT#installation).
+- PyYAML: `python3-yaml` (Debian/Ubuntu), `python3-pyyaml` (Fedora/RHEL),
+  `python3-PyYAML` (openSUSE), `python-yaml` (Arch).
+
+[r]: https://github.com/ilya-zlobintsev/LACT/releases
 
 ## Install
 ```bash
-apt install ./lact-headless-*.deb python3-yaml   # .deb outside /root avoids the _apt warning
-systemctl enable --now lactd
-lact cli list-gpus                               # must list the 3090s
+# 1. LACT + PyYAML, one line for your distro (.deb/.rpm from releases):
+apt install ./lact-headless-*.deb python3-yaml        # Debian 13 (PVE 9), Ubuntu 24.04/26.04; .deb outside /root
+dnf install ./lact-headless-*.rpm python3-pyyaml      # Fedora 43/44, RHEL 8/9
+zypper install ./lact-headless-*.rpm python3-PyYAML   # openSUSE Tumbleweed
+pacman -S lact python-yaml                            # Arch
 
+# 2. Start LACT
+systemctl enable --now lactd
+lact cli list-gpus                                    # must list the 3090s
+
+# 3. Install and run the script
 cp lact-3090-undervolt.sh /usr/local/bin/ && chmod +x /usr/local/bin/lact-3090-undervolt.sh
 cp lact-3090-undervolt.service /etc/systemd/system/
 systemctl enable --now lact-3090-undervolt.service

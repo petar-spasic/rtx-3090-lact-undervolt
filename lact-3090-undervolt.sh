@@ -8,7 +8,7 @@
 # Merges into /etc/lact/config.yaml (keeps other settings; strips comments, as lactd
 # does on save; pre-first-run config kept as config.yaml.bak). Rewrites only on change.
 # lactd applies it immediately and on every boot. Idempotent. Run as root on the
-# host (Proxmox: PVE host, not an LXC). Requires lactd and python3-yaml. Applied to the
+# host (not an unprivileged container). Requires lactd and PyYAML. Applied to the
 # top-level gpus and every LACT profile.
 
 set -euo pipefail
@@ -25,7 +25,8 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 if ! python3 -c 'import yaml' &>/dev/null; then
-    echo "python3-yaml required: apt install python3-yaml" >&2
+    echo "PyYAML required: python3-yaml (Debian/Ubuntu), python3-pyyaml (Fedora/RHEL)," >&2
+    echo "python3-PyYAML (openSUSE), python-yaml (Arch)" >&2
     exit 1
 fi
 
@@ -79,7 +80,10 @@ for section in sections:
         # make sure no power limit is configured
         gpu.pop("power_cap", None)
 
-new = yaml.safe_dump(config, sort_keys=False)
+try:
+    new = yaml.safe_dump(config, sort_keys=False, default_flow_style=False)
+except TypeError:  # PyYAML < 5.1 (RHEL 8): no sort_keys, keys come out sorted
+    new = yaml.safe_dump(config, default_flow_style=False)
 if old is not None and yaml.safe_load(old) == config:
     # unchanged: don't make lactd reload and re-apply everything
     print(f"{path} already up to date")
