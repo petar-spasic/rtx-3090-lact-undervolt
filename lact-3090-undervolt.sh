@@ -32,11 +32,14 @@ fi
 
 # Wait until lactd lists the matching GPUs (at boot they can appear late). Lines:
 #   0: 10DE:2204-1458:403B-0000:0b:00.0 (GeForce RTX 3090) [Dedicated]
-# (older LACT: "(NVIDIA GeForce RTX 3090) [Nvidia]")
+# (older LACT: "(NVIDIA GeForce RTX 3090) [Nvidia]"; some versions omit the "0: " index)
 GPU_IDS=()
 for _ in $(seq 1 30); do
     list=$(timeout 5 lact cli list-gpus 2>/dev/null) || list=""
     mapfile -t GPU_IDS < <(sed -nE "s/^[0-9]+: ([^ ]+) \([^)]*$GPU_MATCH\).*/\1/Ip" <<<"$list")
+    # fall back to lines without the leading index
+    [[ ${#GPU_IDS[@]} -eq 0 ]] &&
+        mapfile -t GPU_IDS < <(sed -nE "s/^([^ ]+) \([^)]*$GPU_MATCH\).*/\1/Ip" <<<"$list")
     [[ ${#GPU_IDS[@]} -gt 0 ]] && break
     sleep 1
 done
